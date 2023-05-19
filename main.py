@@ -392,14 +392,14 @@ def remove_tags_from_tenant(tags: list) -> bool:
 #         remove_tags_from_tenant(tags)
 
 
-def handle_refractor_tags():
+def handle_refactor_tags():
     tl = TagLocations()
     tl.set_all(True)
 
     # get tag replacements from user
     # ------------------------------
-    log.info(f'Since this operation affects many objects in the Plextrac DB it is better to make all tag refractions at once.')
-    log.info(f'First enter each tag that needs to be refractored. Afterwards you will enter the replacement for each entered tag.')
+    log.info(f'Since this operation affects many objects in the Plextrac DB it is better to make all tag refactions at once.')
+    log.info(f'First enter each tag that needs to be refactored. Afterwards you will enter the replacement for each entered tag.')
     tags = []
     replacements = []
     to_string_repacements = ""
@@ -410,8 +410,8 @@ def handle_refractor_tags():
         to_string_repacements += f"'{tag}' -> '{replacement}' | "
     to_string_repacements = to_string_repacements[:-3]
 
-    log.info(f'Selected following refractions: {to_string_repacements}')
-    if not input.continue_prompt("Make selected refractions"):
+    log.info(f'Selected following refactions: {to_string_repacements}')
+    if not input.continue_prompt("Make selected refactions"):
         exit()
 
     # load objects from PT
@@ -438,20 +438,20 @@ def handle_refractor_tags():
     get_writeups(writeups)
     log.debug(f'num of writeups founds: {len(writeups)}')
 
-    # refractor tags
+    # refactor tags
     # --------------
     log.info(f'Loaded {len(clients)} client(s), {len(assets)} asset(s), {len(reports)} report(s), and {len(writeups)} writeup(s) from your Plextrac instance.')
-    if not input.continue_prompt(f'This will make requests to all objects that need to be refractored. This make take awhile'):
+    if not input.continue_prompt(f'This will make requests to all objects that need to be refactored. This make take awhile'):
         exit()
 
     is_all_removed_successfully = True
-    skipped_objects = [0,0,0,0,0] # count of client, asset, report, finding, writeups that could not be refractored
+    skipped_objects = [0,0,0,0,0] # count of client, asset, report, finding, writeups that could not be refactored
 
      # add new tags to tenant
     # ----------------------
     add_tags_to_tenant(replacements)
         
-    # refractor client tags
+    # refactor client tags
     metrics = IterationMetrics(len(clients))
     for client in clients:
         log.info(f'Processing tags in client \'{client["name"]}\'...')
@@ -466,7 +466,7 @@ def handle_refractor_tags():
             if tag in client.get('tags', []):
                 needs_update = True
         if not needs_update:
-            log.info(f'Contains no tags to refractor')
+            log.info(f'Contains no tags to refactor')
             log.info(metrics.print_iter_metrics())
             continue
 
@@ -481,7 +481,7 @@ def handle_refractor_tags():
             continue
         client_tag_update_payload = {"tags": response.json.get('tags', [])}
 
-        # refractor tags on client
+        # refactor tags on client
         for i, tag in enumerate(client_tag_update_payload['tags']): # checking each client tag to see if it needs to be replaced
             if tag in tags:
                 j = tags.index(tag)
@@ -498,10 +498,10 @@ def handle_refractor_tags():
             log.info(metrics.print_iter_metrics())
             continue
 
-        log.success(f'Refractored all tags in {client["name"]}')
+        log.success(f'Refactored all tags in {client["name"]}')
         log.info(metrics.print_iter_metrics())
 
-    # refractor asset tags
+    # refactor asset tags
     metrics = IterationMetrics(len(assets))
     for asset in assets:
         log.info(f'Processing tags in asset \'{asset["asset"]}\'...')
@@ -516,7 +516,7 @@ def handle_refractor_tags():
             if tag in asset.get('tags', []):
                 needs_update = True
         if not needs_update:
-            log.info(f'Contains no tags to refractor')
+            log.info(f'Contains no tags to refactor')
             log.info(metrics.print_iter_metrics())
             continue
 
@@ -531,7 +531,7 @@ def handle_refractor_tags():
             continue
         detailed_asset = response.json
 
-        # refractor tags on asset
+        # refactor tags on asset
         for i, tag in enumerate(detailed_asset.get("tags", [])): # checking each asset tag to see if it needs to be replaced
             if tag in tags:
                 j = tags.index(tag)
@@ -548,10 +548,10 @@ def handle_refractor_tags():
             log.info(metrics.print_iter_metrics())
             continue
 
-        log.success(f'Refractored all tags in {asset["asset"]}')
+        log.success(f'Refactored all tags in {asset["asset"]}')
         log.info(metrics.print_iter_metrics())
 
-    # refractor report tags
+    # refactor report tags
     metrics = IterationMetrics(len(reports))
     for report in reports:
         log.info(f'Processing tags in report \'{report["name"]}\'...')
@@ -573,7 +573,7 @@ def handle_refractor_tags():
                 continue
             detailed_report = response.json
 
-            # refractor tags on report
+            # refactor tags on report
             for i, tag in enumerate(detailed_report.get("tags", [])): # checking each report tag to see if it needs to be replaced
                 if tag in tags:
                     j = tags.index(tag)
@@ -590,11 +590,11 @@ def handle_refractor_tags():
                 log.info(metrics.print_iter_metrics())
                 continue
 
-            log.success(f'Refractored all tags in {report["name"]}')
+            log.success(f'Refactored all tags in {report["name"]}')
         else:
-            log.info(f'Report contains no tags to refractor')
+            log.info(f'Report contains no tags to refactor')
 
-        # refractor finding tags
+        # refactor finding tags
         if report.get('findings', 0) < 1:
             continue
         log.info(f'Loading findings from report...')
@@ -617,11 +617,11 @@ def handle_refractor_tags():
                 if tag in finding.get('tags', []):
                     needs_update = True
             if not needs_update:
-                log.info(f'Contains no tags to refractor')
+                log.info(f'Contains no tags to refactor')
                 log.info(findings_metrics.print_iter_metrics())
                 continue
 
-            # refractor tags on finding
+            # refactor tags on finding
             for i, tag in enumerate(finding.get("tags", [])): # checking each finding tag to see if it needs to be replaced
                 if tag in tags:
                     j = tags.index(tag)
@@ -638,18 +638,18 @@ def handle_refractor_tags():
                 log.info(findings_metrics.print_iter_metrics())
                 continue
 
-            log.success(f'Refractored all tags in {finding["title"]}')
+            log.success(f'Refactored all tags in {finding["title"]}')
             log.info(findings_metrics.print_iter_metrics())
 
         # metrics for report tags and findings on report
         log.info(metrics.print_iter_metrics())
 
-    # refractor writeup tags
+    # refactor writeup tags
     metrics = IterationMetrics(len(writeups))
     for writeup in writeups:
         log.info(f'Processing tags in writeup \'{writeup["title"]}\'...')
 
-        # refractor tags on writeup
+        # refactor tags on writeup
         needs_update = False
         for i, tag in enumerate(writeup.get("tags", [])): # checking each writeup tag to see if it needs to be replaced
             if tag in tags:
@@ -660,7 +660,7 @@ def handle_refractor_tags():
 
         # check if the writeup tags need to be update, the check here saves an api call if not required
         if not needs_update:
-            log.info(f'Contains no tags to refractor')
+            log.info(f'Contains no tags to refactor')
             log.info(metrics.print_iter_metrics())
             continue
 
@@ -674,12 +674,12 @@ def handle_refractor_tags():
             log.info(metrics.print_iter_metrics())
             continue
 
-        log.success(f'Refractored all tags in {writeup["title"]}')
+        log.success(f'Refactored all tags in {writeup["title"]}')
         log.info(metrics.print_iter_metrics())
 
-    log.info(f'\n\nFinished refractoring tags on objects.\n')
+    log.info(f'\n\nFinished refactoring tags on objects.\n')
     if not is_all_removed_successfully:
-        log.info(f'Could not refractor {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
+        log.info(f'Could not refactor {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
         log.info(f'Skipping removing tag from tenant since all references of tags were not removed from objects')
         log.info(f'Completed. See log file for details')
         exit()
@@ -702,11 +702,11 @@ if __name__ == '__main__':
     auth = Auth(args)
     auth.handle_authentication()
 
-    # VALID_TAG_ACTIONS = ["remove", "refractor"]
-    # tag_action = input.user_options(f'Select whether you want to remove or refractor tags', "Invalid option", VALID_TAG_ACTIONS)
+    # VALID_TAG_ACTIONS = ["remove", "refactor"]
+    # tag_action = input.user_options(f'Select whether you want to remove or refactor tags', "Invalid option", VALID_TAG_ACTIONS)
     # if tag_action == "remove":
     #     handle_remove_tags()
-    # elif tag_action == "refractor":
-    #     handle_refractor_tags()
+    # elif tag_action == "refactor":
+    #     handle_refactor_tags()
 
-    handle_refractor_tags()
+    handle_refactor_tags()
