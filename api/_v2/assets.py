@@ -65,7 +65,7 @@ def get_tenant_assets(base_url, headers, payload):
 
 `pagination` is a required key while `sort` and `filters` are optional.
 
-The `pagination.limit` must be one of \[5, 10, 25, 50, 100\]. The `pagination.offset` is the number of records to shift by, not the number of pages to shift by. i.e. offset 2, limit 10 gives you records 2-12 not 20-30
+The `pagination.limit` must be one of \[5, 10, 25, 50, 100, 1000\]. The `pagination.offset` is the number of records to shift by, not the number of pages to shift by. i.e. offset 2, limit 10 gives you records 2-12 not 20-30
 
 The following values can be used in the `sort.by` and `filters.by` field:
 

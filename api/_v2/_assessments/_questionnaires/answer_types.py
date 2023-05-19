@@ -2,7 +2,9 @@ from utils import request_handler as request
 
 def list_answer_types(base_url, headers, tenantId, clientId, payload):
     """
-    This request **retrieves** **all answer types** that exist for a client
+    This request **retrieves** **all answer types** that exist for a client.
+
+Can use the `clientId` of `0` to return all answer types in the tenant.
     """
     name = "List Answer Types"
     root = "/api/v2"

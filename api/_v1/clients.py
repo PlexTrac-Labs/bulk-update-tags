@@ -6,13 +6,15 @@ def list_clients(base_url, headers):
 
 The `instanceUrl` is needed to execute the call.
 
-Below is returned on a successful call:
+A successful call returns a List of JSON objects with summarized information about each client.
+
+Below is the structure of the summaried JSON returned on a successful call:
 
 | **parameter** | **definition** | **example value** |
 | --- | --- | --- |
 | id | full client ID | client_1254 |
-| doc_id | client ID | 1254 |
-| data | available information on client, such as name | 1254, Karbo Industries, null |
+| doc_id | List with a single value of client ID | \[1254\] |
+| data | List of information about hte client:  <br>client id  <br>client name  <br>null value | \[1254, "Karbo Industries", null\] |
     """
     name = "List Clients"
     root = "/api/v1"
@@ -25,15 +27,7 @@ def get_client(base_url, headers, clientId):
 
 The `instanceUrl` and `clientId` is needed to execute the call.
 
-Below is returned on a successful call:
-
-| **parameter** | **definition** | **example value** |
-| --- | --- | --- |
-| name | client name | Karbo Industries |
-| client_id | client ID | 1254 |
-| tenant_id | tenant ID | 40632 |
-| doc_type | type of data | client |
-| users | list of users who have access to client (email, ID, and role) | [janepentester@plextrac.com](mailto:janepentester@plextrac.com), null, ADMIN |
+A successsfull call returns the JSON object of the cient stored in hte DB. See [Client Object](https://docs.plextrac.com/plextrac-documentation/master/plextrac-api/object-structures/client-object) for deatils on how this JSON is structured
     """
     name = "Get Client"
     root = "/api/v1"
@@ -44,14 +38,25 @@ def create_client(base_url, headers, payload):
     """
     This request **creates** a new client within a tenant.
 
-The `instanceUrl` is needed to execute the call, along with a client name, any associated tags, a client description, point of contact name, point of contact email address, and any desired custom fields.
+The `instanceUrl` is needed to execute the call.
+
+In addition to the example below, see [Client Object](https://docs.plextrac.com/plextrac-documentation/master/plextrac-api/object-structures/client-object) for details on the payload structure
 
 Below is returned on a successful call:
 
 | **parameter** | **definition** | **example value** |
 | --- | --- | --- |
 | status | validation of request | success |
-| message | further validation | Client updated successfully. |
+| client_id | Id of the newly created client | 1234 |
+| assign_message | dictionary that summarizes which users were granted acces to the client. This includes the user issuing the request and any user in the default group. |  |
+
+`assign_message` dictionary structure
+
+| **parameter** | **definition** | **example value** |
+| --- | --- | --- |
+| status | status of assigning users to new client | complete |
+| users_assigned | List of user emails that were assigned to client | \["test@email.com"\] |
+| users_rejected | List of user emails that failed to get assigned to client | \["test@email.com"\] |
     """
     name = "Create Client"
     root = "/api/v1"
@@ -62,15 +67,9 @@ def update_client(base_url, headers, clientId, payload):
     """
     This request updates an existing client within a tenant.
 
-The `instanceUrl` and `clientId` is needed to execute the call, along with the information to update:
+The `instanceUrl` and `clientId` is needed to execute the call.
 
-*   client name
-*   tags
-*   client description
-*   point of contact name
-*   point of contact email address
-*   custom fields
-    
+In addition to the example below, see [Client Object](https://docs.plextrac.com/plextrac-documentation/master/plextrac-api/object-structures/client-object) for details on the payload structure.
 
 Below is returned on a successful call:
 
@@ -149,7 +148,7 @@ def list_tenant_client_users(base_url, headers, tenantId, clientId):
 
 def assign_user_to_client(base_url, headers, tenantId, clientId, payload):
     """
-    DEPRECATED - See v2 Assign Users to Client
+    DEPRECATED - See v2 [Bulk Assign Users to Client](https://api-docs.plextrac.com/#8b017c78-cdcf-4046-9d25-ca6d0dcb1d82)
 
 Known Bug
 

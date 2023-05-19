@@ -31,6 +31,16 @@ class IterationMetrics:
         self.avg_time = 0
         self.time_remaining = self.avg_time * (self.max_iterations - (self.curr_iteration+1))
 
+    def step_iter_without_display(self) -> None:
+        curr_time = time.time()
+        iter_time = curr_time - self.last_time
+        self.total_time += iter_time
+        self.avg_time = self.total_time/(self.curr_iteration+1)
+        self.time_remaining = self.avg_time * (self.max_iterations - (self.curr_iteration+1))
+
+        self.curr_iteration += 1
+        self.last_time = curr_time
+
     def print_iter_metrics(self) -> str:
         curr_time = time.time()
         iter_time = curr_time - self.last_time

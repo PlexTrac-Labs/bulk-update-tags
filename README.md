@@ -1,7 +1,7 @@
-# base-API-script
-This repo can be used as a starting point for developing a Python script that utilizes the Plextrac API in some way. It acts as a mini framework with some helpful utilities that make endpoint calls easier. These utilities include a logger, authentication handler, API wrapper library that stores endpoint URLs, and other general utility function that revolve around user inputs, data sanitization, and data validation.
+# bulk-update-tags
+This scripts is meant to help make bulk tag operations across different objects tags can be added to. Most commonly you can tag clients, assets, reports, findings, or writeups in the WriteupsDB. This script allows you search across all these objects for a specific tags and replace it with a new value.
 
-To get started make a copy of this repo and read through the main.py file which goes more in-depth about the utilities available. You can also run the script with the instructions below to see the output of the examples used when describing the utilities available. Once you know what's available, you can remove the examples, and start writing your script in the main.py file.
+Tags also exist at the tenant level. The list of tenant tags is what poplates the dropdown whenever adding a tag to an object. This script will add any tag to the tenant level if it was added to an object. It will also remove tags from the tenant level after sucessfully replacing the tag with a new value on all objects.
 
 # Requirements
 - [Python 3+](https://www.python.org/downloads/)
@@ -38,7 +38,11 @@ The following values can either be added to the `config.yaml` file or entered wh
 - Password
 
 ## Script Execution Flow
-- Starts executing the main.py file
-- Prints script info stored in settings.py
-- Reads in values from config.yaml file
-- Goes through list of examples to show the user current functionality that can be utilized
+Since the script has to load a lot of objects from the DB, ideally you input multiple tag refractions that the script will then update as it runs through the data once.
+- Authenticates user to Plextrac instance with tags to be refractored
+- Prompts use to start entering tags that need to be replaced. Continue entering all tags that need to be replaced individually.
+- Once all tags to be replaced are entered, if will run through each tag entered and ask for the replacement for each tag
+- After confirming refractions to be made, will create lists of all objects by making multiple API requests to the Plextrac instance
+- After confirming the objects that were loaded, will go through lists and make API requests to update any object found to have tags that need to be refractored
+
+The script will create a log file each time it is run. The script should only stop if it fails to load data at the beginning. As it runs, if an object couldn't be updated, it will log the exception and continue running. You can Ctrl+F and search for `exception` in the generateed log file to see any problems during runtime.

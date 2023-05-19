@@ -24,7 +24,7 @@ if not settings.verify_ssl:
     # noinspection PyUnresolvedReferences
     requests.packages.urllib3.disable_warnings()
 
-def _do(http_method: str, base_url: str, headers: dict, endpoint: str, name: str, data: Dict = None, files = None) -> PTWrapperLibraryResponse:
+def _do(http_method: str, base_url: str, headers: dict, endpoint: str, name: str, data: Dict = None, files = None, retry:bool=True) -> PTWrapperLibraryResponse:
     """
     :param http_method: HTTP method, GET, POST, PUT, DELETE
     :type http_method: str
@@ -40,6 +40,8 @@ def _do(http_method: str, base_url: str, headers: dict, endpoint: str, name: str
     :type data: Dict, optional
     :param files: file data send in a multipart form request, defaults to None
     :type files: _type_, optional
+    :param retry: retries are globally enabled in settings.py this allows for disabling retries for a specific endpoint, defaults to True
+    :type retry: bool, optional
     :raises PTWrapperLibraryException: general request failure
     :raises PTWrapperLibraryJSONResponse: request doesn't return JSON data
     :raises PTWrapperLibraryFailed: non 200 response
@@ -51,15 +53,18 @@ def _do(http_method: str, base_url: str, headers: dict, endpoint: str, name: str
     log_line_post = ', '.join((log_line_pre, "success={}, status_code={}, message={}"))
     
     retries = 0
-    while retries <= settings.retries:
+    max_retries = settings.retries
+    if not retry:
+        max_retries = 0
+    while retries <= max_retries:
         # Log HTTP params and perform an HTTP request, catching and re-raising any exceptions
         try:
             log.debug(log_line_pre)
             response = requests.request(method=http_method, url=full_url, verify=settings.verify_ssl, headers=headers, json=data, files=files)
         except requests.exceptions.RequestException as e:
-            if retries < settings.retries:
+            if retries < max_retries:
                 retries += 1
-                log.exception(f'Request failed - {name}. Retrying... ({retries}/{settings.retries})\nException: {str(e)}')
+                log.exception(f'Request failed - {name}. Retrying... ({retries}/{max_retries})\nException: {str(e)}')
                 time.sleep(5)
                 continue # if this part doesn't succeed you can't continue. prevents incrementing `retries` more than once in a single attempt
             else:
@@ -68,7 +73,7 @@ def _do(http_method: str, base_url: str, headers: dict, endpoint: str, name: str
         try:
             data_out = response.json()
         except (ValueError, JSONDecodeError) as e:
-            if retries < settings.retries:
+            if retries < max_retries:
                 retries += 1
                 log.exception(log_line_post.format(False, None, e))
                 time.sleep(5)
@@ -81,16 +86,16 @@ def _do(http_method: str, base_url: str, headers: dict, endpoint: str, name: str
         if is_success:
             log.debug(log_line)
             return PTWrapperLibraryResponse(response, response.status_code, message=response.reason, json=data_out)
-        if retries < settings.retries:
+        if retries < max_retries:
             retries += 1
             log.exception(log_line)
             time.sleep(5)
             continue # if this part doesn't succeed you can't continue. prevents incrementing `retries` more than once in a single attempt
         else:
             log.exception(f'{log_line}, pt_message={data_out.get("message")}')
-            raise PTWrapperLibraryFailed(f'{name} - {response.status_code}: {response.reason}')
+            raise PTWrapperLibraryFailed(f'{name} - {response.status_code}: {response.reason}', response=response)
     
-def get(base_url: str, headers: dict, endpoint: str, name: str) -> PTWrapperLibraryResponse:
+def get(base_url: str, headers: dict, endpoint: str, name: str, retry:bool=True) -> PTWrapperLibraryResponse:
     """
     GET request wrapper
 
@@ -102,6 +107,8 @@ def get(base_url: str, headers: dict, endpoint: str, name: str) -> PTWrapperLibr
     :type endpoint: str
     :param name: name of API endpoint, mentioned during exceptions
     :type name: str
+    :param retry: retries are globally enabled in settings.py this allows for disabling retries for a specific endpoint, defaults to True
+    :type retry: bool, optional
     :return: custom wrapper for Python requests.Response object
     :rtype: PTWrapperLibraryResponse
     """    
@@ -113,7 +120,7 @@ def get(base_url: str, headers: dict, endpoint: str, name: str) -> PTWrapperLibr
 #     'file': file
 # }
 # where file is img in `with open(f'{image_path}{image_file_name}.{ext}', "rb") as img:`
-def post(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = None, files = None) -> PTWrapperLibraryResponse:
+def post(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = None, files = None, retry:bool=True) -> PTWrapperLibraryResponse:
     """
     POST request wrapper
 
@@ -129,12 +136,14 @@ def post(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = No
     :type data: Dict, optional
     :param files: file data send in a multipart form request, defaults to None
     :type files: _type_, optional
+    :param retry: retries are globally enabled in settings.py this allows for disabling retries for a specific endpoint, defaults to True
+    :type retry: bool, optional
     :return: custom wrapper for Python requests.Response object
     :rtype: PTWrapperLibraryResponse
     """  
     return _do(http_method='POST', base_url=base_url, headers=headers, endpoint=endpoint, name=name, data=data, files=files)
     
-def put(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = None) -> PTWrapperLibraryResponse:
+def put(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = None, retry:bool=True) -> PTWrapperLibraryResponse:
     """
     PUT request wrapper
 
@@ -148,12 +157,14 @@ def put(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = Non
     :type name: str
     :param data: request payload, defaults to None
     :type data: Dict, optional
+    :param retry: retries are globally enabled in settings.py this allows for disabling retries for a specific endpoint, defaults to True
+    :type retry: bool, optional
     :return: custom wrapper for Python requests.Response object
     :rtype: PTWrapperLibraryResponse
     """  
     return _do(http_method='PUT', base_url=base_url, headers=headers, endpoint=endpoint, name=name, data=data)
     
-def delete(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = None) -> PTWrapperLibraryResponse:
+def delete(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = None, retry:bool=True) -> PTWrapperLibraryResponse:
     """
     DELETE request wrapper
 
@@ -167,6 +178,8 @@ def delete(base_url: str, headers: dict, endpoint: str, name: str, data: Dict = 
     :type name: str
     :param data: request payload, defaults to None
     :type data: Dict, optional
+    :param retry: retries are globally enabled in settings.py this allows for disabling retries for a specific endpoint, defaults to True
+    :type retry: bool, optional
     :return: custom wrapper for Python requests.Response object
     :rtype: PTWrapperLibraryResponse
     """  

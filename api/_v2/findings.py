@@ -71,12 +71,3 @@ def copy_finding_to_writeups_repository(base_url, headers, payload):
     root = "/api/v2"
     path = f'/repositories/copyFlawToWriteupsRepository'
     return request.post(base_url, headers, root+path, name, payload)
-
-def get_tenant_findings(base_url, headers, tenantId, payload):
-    """
-    No description in Postman
-    """
-    name = "Get Tenant Findings"
-    root = "/api/v2"
-    path = f'/tenant/{tenantId}/findings'
-    return request.post(base_url, headers, root+path, name, payload)

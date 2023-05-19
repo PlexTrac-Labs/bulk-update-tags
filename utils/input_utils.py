@@ -80,6 +80,22 @@ def user_list(msg: str, retry_msg: str = "", range: int = 0) -> int:
         return user_list(msg, retry_msg, range)
 
 
+def continue_prompt(msg: str) -> bool:
+    """
+    Prompts a user whether they want to continue after giving a status update,
+    by adding the string " Continue? (y/n)" to the end of the `msg` passed in.
+
+    :param msg: message to display with the prompt
+    :type msg: str
+    :return: True if user types "y" else False
+    :rtype: bool
+    """    
+    entered = input(prompt_prefix + msg + " Continue? (y/n)" + prompt_suffix)
+    if entered == 'y':
+        return True
+    else:
+        return False
+    
 def continue_anyways(msg: str) -> bool:
     """
     Prompts a user whether they want to continue despite a potentially problematic input,

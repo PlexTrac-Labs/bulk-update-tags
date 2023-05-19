@@ -2,7 +2,7 @@ from utils import request_handler as request
 
 def get_findings_filtration(base_url, headers, clients, reports, date_from, date_to):
     """
-    This request **retrieves a specific report** from a client with date filters.
+    This request **retrieves frindings** from a client and report with date filters.
 
     Query Parameters:
     clients: Array of client IDs - example ({{clientId}})
@@ -36,6 +36,10 @@ def get_finding(base_url, headers, clientId, reportId, findingId):
 def create_finding(base_url, headers, clientId, reportId, payload):
     """
     This request **creates a finding** for a specific report.
+
+When a finding is created in the UI there are a few processes that get kicked off that do not happen when calling this endpoint directly. Including:
+
+**Registering Tags** - Any tags added to the finding that have not been added anywhere else in the instnace will be added to the finding but NOT to the list of tenant tags. This means when you start typing to add a tag anywhere in the platform, the dropdown list that pops up will not have the new tags since they weren't added to the listed of tenant tags.
     """
     name = "Create Finding"
     root = "/api/v1"

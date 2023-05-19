@@ -13,7 +13,7 @@ def add_writeups_repository_users(base_url, headers, repositoryId, payload):
     """
     This request **adds users to a specific repository** in the **WriteupsD**B module by adding a new user entry for each user in the list sent to the endpoint.
 
-If a user already exists, this request will result in a copy/duplicate entry of that user.
+The userId will be used to lookup a user in the Plextrac instance. That user's name and email will be used instead of the data passed into this payload.
     """
     name = "Add Writeups Repository Users"
     root = "/api/v2"

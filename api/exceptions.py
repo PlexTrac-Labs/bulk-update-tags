@@ -1,8 +1,11 @@
-class PTWrapperLibraryException(Exception):
+from requests.exceptions import *
+
+class PTWrapperLibraryException(RequestException):
     pass
 
-class PTWrapperLibraryJSONResponse(Exception):
+class PTWrapperLibraryJSONResponse(InvalidJSONError):
     pass
 
-class PTWrapperLibraryFailed(Exception):
-    pass
+class PTWrapperLibraryFailed(HTTPError):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
