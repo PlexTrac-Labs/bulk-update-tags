@@ -2,6 +2,7 @@ import yaml
 from tabulate import tabulate
 from copy import deepcopy
 import requests
+from typing import TypedDict, List
 
 import settings
 import utils.log_handler as logger
@@ -379,17 +380,257 @@ def remove_tags_from_tenant(tags: list) -> bool:
     return all_removed_successfully
 
 
-# def handle_remove_tags():
-#     tl = get_tag_locations_from_user(TagLocations())
-#     tags = []
-#     get_multiple_tags_from_user(tags, sanitize=False)
-#     log.info(f'Selected tags to remove: {tags}')
-#     log.info(f'Loading {tl.get_selected()} from instance...')
-#     # loaded this many are you sure you want to remove
-#     is_all_removed_successfully = True
-#     # remove all
-#     if tl.is_all_selected and is_all_removed_successfully:
-#         remove_tags_from_tenant(tags)
+def need_tag_updates(obj_tags: list, tags_to_find: list) -> bool:
+    """
+    _summary_
+
+    :param tags: _description_
+    :type tags: list
+    :return: _description_
+    :rtype: bool
+    """
+    if len(obj_tags) < 1:
+        return False
+    needs_update = False
+    for tag in obj_tags:
+        if tag in tags_to_find:
+            needs_update = True
+    if not needs_update:
+        return False
+    return True
+
+
+
+class client_action_params(TypedDict):
+    obj_tags: List[str]
+    tags_to_find: List[str]
+    tags_to_act: List[str]
+
+def refractor_tags(params: client_action_params) -> None:
+    for i, tag in enumerate(params.obj_tags): # checking each tag to see if it needs to be replaced
+        if tag in params.tags_to_find:
+            replacement_tag = params.tags_to_act[params.tags_to_find.index(tag)]
+            params.obj_tags.pop(i)
+            params.obj_tags.insert(i, replacement_tag)
+
+def remove_tags(params: client_action_params) -> None:
+    for tag in params.obj_tags: # checking each tag to see if it needs to be removed
+        if tag in params.tags_to_find:
+            params.obj_tags.remove(tag)
+
+def add_tags(params: client_action_params) -> None:
+    for i, tag in enumerate(params.obj_tags): # checking each tag to see if another tag should be added
+        if tag in params.tags_to_find:
+            additional_tag = params.tags_to_act[params.tags_to_find.index(tag)]
+            params.obj_tags.append(additional_tag)
+
+
+
+class action_params(TypedDict):
+    tags_to_find: List[str]
+    tags_to_act: List[str]
+
+
+def handle_client_tag_updates(skipped_objects: list, clients: list, action: function, params: action_params) -> None:
+    metrics = IterationMetrics(len(clients))
+    for client in clients:
+        log.info(f'Processing tags in client \'{client["name"]}\'...')
+
+        # check if the client tags need to be update, the check here saves an api call if not required
+        if not need_tag_updates(client.get('tags', []), params.tags_to_find):
+            log.info(f'Contains no tags to refactor')
+            log.info(metrics.print_iter_metrics())
+            continue
+
+        # get full client object
+        try:
+            response = api._v1.clients.get_client(auth.base_url, auth.get_auth_headers(), client['client_id'])
+        except Exception as e:
+            log.exception(f'Could not load client. Skipping...')
+            skipped_objects[0] += 1
+            log.info(metrics.print_iter_metrics())
+            continue
+        client_tag_update_payload = {"tags": response.json.get('tags', [])}
+
+        # refactor tags on client
+        client_params = {
+            "obj_tags": client.get('tags', []),
+            "tags_to_find": params.tags_to_find,
+            "tags_to_act": params.tags_to_act
+        }
+        action(client_params)
+
+        # update client
+        try:
+            response = api._v1.clients.update_client(auth.base_url, auth.get_auth_headers(), client['client_id'], client_tag_update_payload)
+        except Exception as e:
+            log.exception(f'Could not update client. Skipping...')
+            skipped_objects[0] += 1
+            log.info(metrics.print_iter_metrics())
+            continue
+
+        log.success(f'Refactored all tags in {client["name"]}')
+        log.info(metrics.print_iter_metrics())
+
+
+def handle_asset_tag_updates(skipped_objects: list, assets: list, action: function, params: action_params) -> None:
+    metrics = IterationMetrics(len(assets))
+    for asset in assets:
+        log.info(f'Processing tags in asset \'{asset["asset"]}\'...')
+
+        # check if the asset tags need to be update, the check here saves an api call if not required
+        if not need_tag_updates(asset.get('tags', []), params.tags_to_find):
+            log.info(f'Contains no tags to refactor')
+            log.info(metrics.print_iter_metrics())
+            continue
+
+        # get full asset object
+        try:
+            response = api._v1.assets.get_asset(auth.base_url, auth.get_auth_headers(), asset['client_id'], asset['id'])
+        except Exception as e:
+            log.exception(f'Could not load asset. Skipping...')
+            skipped_objects[1] += 1
+            log.info(metrics.print_iter_metrics())
+            continue
+        detailed_asset = response.json
+
+        # refactor tags on 
+        asset_params = {
+            "obj_tags": asset.get('tags', []),
+            "tags_to_find": params.tags_to_find,
+            "tags_to_act": params.tags_to_act
+        }
+        action(asset_params)
+
+        # update asset
+        try:
+            response = api._v1.assets.update_asset(auth.base_url, auth.get_auth_headers(), asset['client_id'], asset['id'], detailed_asset)
+        except Exception as e:
+            log.exception(f'Could not update asset. Skipping...')
+            skipped_objects[1] += 1
+            log.info(metrics.print_iter_metrics())
+            continue
+
+        log.success(f'Refactored all tags in {asset["asset"]}')
+        log.info(metrics.print_iter_metrics())
+
+
+def handle_report_tag_updates(skipped_objects: list, reports: list, action: function, params: action_params) -> None:
+    metrics = IterationMetrics(len(reports))
+    for report in reports:
+        log.info(f'Processing tags in report \'{report["name"]}\'...')
+
+        # check if the report tags need to be update, the check here saves an api call if not required
+        if need_tag_updates(report.get('tags', []), params.tags_to_find):
+            # get full report object
+            try:
+                response = api._v1.reports.get_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'])
+            except Exception as e:
+                log.exception(f'Could not load report. Skipping...')
+                skipped_objects[2] += 1
+                log.info(metrics.print_iter_metrics())
+                continue
+            detailed_report = response.json
+
+            # refactor tags on report
+            report_params = {
+                "obj_tags": report.get('tags', []),
+                "tags_to_find": params.tags_to_find,
+                "tags_to_act": params.tags_to_act
+            }
+            action(report_params)
+
+            # update report
+            try:
+                response = api._v1.reports.update_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'], detailed_report)
+            except Exception as e:
+                log.exception(f'Could not update report. Skipping...')
+                skipped_objects[2] += 1
+                log.info(metrics.print_iter_metrics())
+                continue
+
+            log.success(f'Refactored all tags in {report["name"]}')
+        else:
+            log.info(f'Report contains no tags to refactor')
+
+        # refactor finding tags
+        if report.get('findings', 0) < 1:
+            continue
+        log.info(f'Loading findings from report...')
+        findings = []
+        if not get_page_of_findings(report['client_id'], report['id'], 0, findings=findings):
+            continue
+        log.debug(f'num of findings founds: {len(findings)}')
+
+        handle_finding_tag_updates(skipped_objects, findings, refractor_tags, params)
+
+        # metrics for report tags and findings on report
+        log.info(metrics.print_iter_metrics())
+
+
+def handle_finding_tag_updates(skipped_objects: list, findings: list, action: function, params: action_params) -> None:
+    findings_metrics = IterationMetrics(len(findings))
+    for finding in findings:
+        log.info(f'Processing tags in finding \'{finding["title"]}\'...')
+
+        # check if the finding tags need to be update, the check here saves an api call if not required
+        if not need_tag_updates(finding.get('tags', []), params.tags_to_find):
+            log.info(f'Contains no tags to refactor')
+            log.info(findings_metrics.print_iter_metrics())
+            continue
+
+        # refactor tags on finding
+        finding_params = {
+            "obj_tags": finding.get('tags', []),
+            "tags_to_find": params.tags_to_find,
+            "tags_to_act": params.tags_to_act
+        }
+        action(finding_params)
+
+        # update finding
+        try:
+            response = api._v1.findings.update_finding(auth.base_url, auth.get_auth_headers(), finding['client_id'], finding['report_id'], finding['flaw_id'], finding)
+        except Exception as e:
+            log.exception(f'Could not update finding. Skipping...')
+            skipped_objects[3] += 1
+            log.info(findings_metrics.print_iter_metrics())
+            continue
+
+        log.success(f'Refactored all tags in {finding["title"]}')
+        log.info(findings_metrics.print_iter_metrics())
+
+
+def handle_writeup_tag_updates(skipped_objects: list, writeups: list, action: function, params: action_params) -> None:
+    metrics = IterationMetrics(len(writeups))
+    for writeup in writeups:
+        log.info(f'Processing tags in writeup \'{writeup["title"]}\'...')
+
+        # check if the writeup tags need to be update, the check here saves an api call if not required
+        if not need_tag_updates(writeup.get('tags', []), params.tags_to_find):
+            log.info(f'Contains no tags to refactor')
+            log.info(metrics.print_iter_metrics())
+            continue
+
+        # refactor tags on writeup
+        writeup_params = {
+            "obj_tags": writeup.get('tags', []),
+            "tags_to_find": params.tags_to_find,
+            "tags_to_act": params.tags_to_act
+        }
+        action(writeup_params)
+
+        # update writeup
+        try:
+            response = api._v1._content_library.writeups.update_writeups(auth.base_url, auth.get_auth_headers(), writeup['doc_id'], writeup)
+        except Exception as e:
+            log.exception(f'Could not update writeup. Skipping...')
+            skipped_objects[4] += 1
+            log.info(metrics.print_iter_metrics())
+            continue
+
+        log.success(f'Refactored all tags in {writeup["title"]}')
+        log.info(metrics.print_iter_metrics())
+
 
 
 def handle_refactor_tags():
@@ -444,7 +685,6 @@ def handle_refactor_tags():
     if not input.continue_prompt(f'This will make requests to all objects that need to be refactored. This make take awhile'):
         exit()
 
-    is_all_removed_successfully = True
     skipped_objects = [0,0,0,0,0] # count of client, asset, report, finding, writeups that could not be refactored
 
      # add new tags to tenant
@@ -452,233 +692,36 @@ def handle_refactor_tags():
     add_tags_to_tenant(replacements)
         
     # refactor client tags
-    metrics = IterationMetrics(len(clients))
-    for client in clients:
-        log.info(f'Processing tags in client \'{client["name"]}\'...')
-
-        # check if the client tags need to be update, the check here saves an api call if not required
-        if len(client.get('tags', [])) < 1:
-            log.info(f'Contains no tags')
-            log.info(metrics.print_iter_metrics())
-            continue
-        needs_update = False
-        for tag in tags:
-            if tag in client.get('tags', []):
-                needs_update = True
-        if not needs_update:
-            log.info(f'Contains no tags to refactor')
-            log.info(metrics.print_iter_metrics())
-            continue
-
-        # get full client object
-        try:
-            response = api._v1.clients.get_client(auth.base_url, auth.get_auth_headers(), client['client_id'])
-        except Exception as e:
-            log.exception(f'Could not load client. Skipping...')
-            is_all_removed_successfully = False
-            skipped_objects[0] += 1
-            log.info(metrics.print_iter_metrics())
-            continue
-        client_tag_update_payload = {"tags": response.json.get('tags', [])}
-
-        # refactor tags on client
-        for i, tag in enumerate(client_tag_update_payload['tags']): # checking each client tag to see if it needs to be replaced
-            if tag in tags:
-                j = tags.index(tag)
-                client_tag_update_payload['tags'].pop(i)
-                client_tag_update_payload['tags'].insert(i, replacements[j])
-
-        # update client
-        try:
-            response = api._v1.clients.update_client(auth.base_url, auth.get_auth_headers(), client['client_id'], client_tag_update_payload)
-        except Exception as e:
-            log.exception(f'Could not update client. Skipping...')
-            is_all_removed_successfully = False
-            skipped_objects[0] += 1
-            log.info(metrics.print_iter_metrics())
-            continue
-
-        log.success(f'Refactored all tags in {client["name"]}')
-        log.info(metrics.print_iter_metrics())
+    refractor_params = {
+        "tags_to_find": tags,
+        "tags_to_act": replacements
+    }
+    handle_client_tag_updates(skipped_objects, clients, refractor_tags, refractor_params)
 
     # refactor asset tags
-    metrics = IterationMetrics(len(assets))
-    for asset in assets:
-        log.info(f'Processing tags in asset \'{asset["asset"]}\'...')
-
-        # check if the asset tags need to be update, the check here saves an api call if not required
-        if len(asset.get('tags', [])) < 1:
-            log.info(f'Contains no tags')
-            log.info(metrics.print_iter_metrics())
-            continue
-        needs_update = False
-        for tag in tags:
-            if tag in asset.get('tags', []):
-                needs_update = True
-        if not needs_update:
-            log.info(f'Contains no tags to refactor')
-            log.info(metrics.print_iter_metrics())
-            continue
-
-        # get full asset object
-        try:
-            response = api._v1.assets.get_asset(auth.base_url, auth.get_auth_headers(), asset['client_id'], asset['id'])
-        except Exception as e:
-            log.exception(f'Could not load asset. Skipping...')
-            is_all_removed_successfully = False
-            skipped_objects[1] += 1
-            log.info(metrics.print_iter_metrics())
-            continue
-        detailed_asset = response.json
-
-        # refactor tags on asset
-        for i, tag in enumerate(detailed_asset.get("tags", [])): # checking each asset tag to see if it needs to be replaced
-            if tag in tags:
-                j = tags.index(tag)
-                detailed_asset['tags'].pop(i)
-                detailed_asset['tags'].insert(i, replacements[j])
-
-        # update asset
-        try:
-            response = api._v1.assets.update_asset(auth.base_url, auth.get_auth_headers(), asset['client_id'], asset['id'], detailed_asset)
-        except Exception as e:
-            log.exception(f'Could not update asset. Skipping...')
-            is_all_removed_successfully = False
-            skipped_objects[1] += 1
-            log.info(metrics.print_iter_metrics())
-            continue
-
-        log.success(f'Refactored all tags in {asset["asset"]}')
-        log.info(metrics.print_iter_metrics())
+    refractor_params = {
+        "tags_to_find": tags,
+        "tags_to_act": replacements
+    }
+    handle_asset_tag_updates(skipped_objects, assets, refractor_tags, refractor_params)
 
     # refactor report tags
-    metrics = IterationMetrics(len(reports))
-    for report in reports:
-        log.info(f'Processing tags in report \'{report["name"]}\'...')
-
-        # check if the report tags need to be update, the check here saves an api call if not required
-        report_needs_update = False
-        for tag in tags:
-            if tag in report.get('tags', []):
-                report_needs_update = True
-        if report_needs_update:
-            # get full report object
-            try:
-                response = api._v1.reports.get_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'])
-            except Exception as e:
-                log.exception(f'Could not load report. Skipping...')
-                is_all_removed_successfully = False
-                skipped_objects[2] += 1
-                log.info(metrics.print_iter_metrics())
-                continue
-            detailed_report = response.json
-
-            # refactor tags on report
-            for i, tag in enumerate(detailed_report.get("tags", [])): # checking each report tag to see if it needs to be replaced
-                if tag in tags:
-                    j = tags.index(tag)
-                    detailed_report['tags'].pop(i)
-                    detailed_report['tags'].insert(i, replacements[j])
-
-            # update report
-            try:
-                response = api._v1.reports.update_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'], detailed_report)
-            except Exception as e:
-                log.exception(f'Could not update report. Skipping...')
-                is_all_removed_successfully = False
-                skipped_objects[2] += 1
-                log.info(metrics.print_iter_metrics())
-                continue
-
-            log.success(f'Refactored all tags in {report["name"]}')
-        else:
-            log.info(f'Report contains no tags to refactor')
-
-        # refactor finding tags
-        if report.get('findings', 0) < 1:
-            continue
-        log.info(f'Loading findings from report...')
-        findings = []
-        if not get_page_of_findings(report['client_id'], report['id'], 0, findings=findings):
-            continue
-        log.debug(f'num of findings founds: {len(findings)}')
-
-        findings_metrics = IterationMetrics(len(findings))
-        for finding in findings:
-            log.info(f'Processing tags in finding \'{finding["title"]}\'...')
-
-            # check if the finding tags need to be update, the check here saves an api call if not required
-            if len(finding.get('tags', [])) < 1:
-                log.info(f'Contains no tags')
-                log.info(findings_metrics.print_iter_metrics())
-                continue
-            needs_update = False
-            for tag in tags:
-                if tag in finding.get('tags', []):
-                    needs_update = True
-            if not needs_update:
-                log.info(f'Contains no tags to refactor')
-                log.info(findings_metrics.print_iter_metrics())
-                continue
-
-            # refactor tags on finding
-            for i, tag in enumerate(finding.get("tags", [])): # checking each finding tag to see if it needs to be replaced
-                if tag in tags:
-                    j = tags.index(tag)
-                    finding['tags'].pop(i)
-                    finding['tags'].insert(i, replacements[j])
-
-            # update finding
-            try:
-                response = api._v1.findings.update_finding(auth.base_url, auth.get_auth_headers(), finding['client_id'], finding['report_id'], finding['flaw_id'], finding)
-            except Exception as e:
-                log.exception(f'Could not update finding. Skipping...')
-                is_all_removed_successfully = False
-                skipped_objects[3] += 1
-                log.info(findings_metrics.print_iter_metrics())
-                continue
-
-            log.success(f'Refactored all tags in {finding["title"]}')
-            log.info(findings_metrics.print_iter_metrics())
-
-        # metrics for report tags and findings on report
-        log.info(metrics.print_iter_metrics())
+    refractor_params = {
+        "tags_to_find": tags,
+        "tags_to_act": replacements
+    }
+    handle_report_tag_updates(skipped_objects, reports, refractor_tags, refractor_params)
 
     # refactor writeup tags
-    metrics = IterationMetrics(len(writeups))
-    for writeup in writeups:
-        log.info(f'Processing tags in writeup \'{writeup["title"]}\'...')
-
-        # refactor tags on writeup
-        needs_update = False
-        for i, tag in enumerate(writeup.get("tags", [])): # checking each writeup tag to see if it needs to be replaced
-            if tag in tags:
-                j = tags.index(tag)
-                writeup['tags'].pop(i)
-                writeup['tags'].insert(i, replacements[j])
-                needs_update = True
-
-        # check if the writeup tags need to be update, the check here saves an api call if not required
-        if not needs_update:
-            log.info(f'Contains no tags to refactor')
-            log.info(metrics.print_iter_metrics())
-            continue
-
-        # update writeup
-        try:
-            response = api._v1._content_library.writeups.update_writeups(auth.base_url, auth.get_auth_headers(), writeup['doc_id'], writeup)
-        except Exception as e:
-            log.exception(f'Could not update writeup. Skipping...')
-            is_all_removed_successfully = False
-            skipped_objects[4] += 1
-            log.info(metrics.print_iter_metrics())
-            continue
-
-        log.success(f'Refactored all tags in {writeup["title"]}')
-        log.info(metrics.print_iter_metrics())
+    refractor_params = {
+        "tags_to_find": tags,
+        "tags_to_act": replacements
+    }
+    handle_writeup_tag_updates(skipped_objects, writeups, refractor_tags, refractor_params)
+    
 
     log.info(f'\n\nFinished refactoring tags on objects.\n')
-    if not is_all_removed_successfully:
+    if sum(skipped_objects) > 0:
         log.info(f'Could not refactor {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
         log.info(f'Skipping removing tag from tenant since all references of tags were not removed from objects')
         log.info(f'Completed. See log file for details')
@@ -690,6 +733,21 @@ def handle_refactor_tags():
 
     log.info(f'Completed. See log file for details')
 
+
+# def handle_remove_tags():
+#     tl = get_tag_locations_from_user(TagLocations())
+#     tags = []
+#     get_multiple_tags_from_user(tags, sanitize=False)
+#     log.info(f'Selected tags to remove: {tags}')
+#     log.info(f'Loading {tl.get_selected()} from instance...')
+#     # loaded this many are you sure you want to remove
+#     # remove all
+#     if tl.is_all_selected and sum(skipped_objects) > 0:
+#         remove_tags_from_tenant(tags)
+
+
+# def handle_add_tags():
+#     pass
 
 
 if __name__ == '__main__':
@@ -708,5 +766,7 @@ if __name__ == '__main__':
     #     handle_remove_tags()
     # elif tag_action == "refactor":
     #     handle_refactor_tags()
+    # elif tag_action == "add":
+    #     handle_add_tags()
 
     handle_refactor_tags()
