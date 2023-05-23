@@ -2,7 +2,7 @@ import yaml
 from tabulate import tabulate
 from copy import deepcopy
 import requests
-from typing import TypedDict, List
+from typing import TypedDict, List, Callable
 
 import settings
 import utils.log_handler as logger
@@ -407,22 +407,22 @@ class client_action_params(TypedDict):
     tags_to_act: List[str]
 
 def refractor_tags(params: client_action_params) -> None:
-    for i, tag in enumerate(params.obj_tags): # checking each tag to see if it needs to be replaced
-        if tag in params.tags_to_find:
-            replacement_tag = params.tags_to_act[params.tags_to_find.index(tag)]
-            params.obj_tags.pop(i)
-            params.obj_tags.insert(i, replacement_tag)
+    for i, tag in enumerate(params['obj_tags']): # checking each tag to see if it needs to be replaced
+        if tag in params['tags_to_find']:
+            replacement_tag = params['tags_to_act'][params['tags_to_find'].index(tag)]
+            params['obj_tags'].pop(i)
+            params['obj_tags'].insert(i, replacement_tag)
 
 def remove_tags(params: client_action_params) -> None:
-    for tag in params.obj_tags: # checking each tag to see if it needs to be removed
-        if tag in params.tags_to_find:
-            params.obj_tags.remove(tag)
+    for tag in params['obj_tags']: # checking each tag to see if it needs to be removed
+        if tag in params['tags_to_find']:
+            params['obj_tags'].remove(tag)
 
 def add_tags(params: client_action_params) -> None:
-    for i, tag in enumerate(params.obj_tags): # checking each tag to see if another tag should be added
-        if tag in params.tags_to_find:
-            additional_tag = params.tags_to_act[params.tags_to_find.index(tag)]
-            params.obj_tags.append(additional_tag)
+    for i, tag in enumerate(params['obj_tags']): # checking each tag to see if another tag should be added
+        if tag in params['tags_to_find']:
+            additional_tag = params['tags_to_act'][params['tags_to_find'].index(tag)]
+            params['obj_tags'].append(additional_tag)
 
 
 
@@ -431,13 +431,13 @@ class action_params(TypedDict):
     tags_to_act: List[str]
 
 
-def handle_client_tag_updates(skipped_objects: list, clients: list, action: function, params: action_params) -> None:
+def handle_client_tag_updates(skipped_objects: list, clients: list, action: Callable[[client_action_params], None], params: action_params) -> None:
     metrics = IterationMetrics(len(clients))
     for client in clients:
         log.info(f'Processing tags in client \'{client["name"]}\'...')
 
         # check if the client tags need to be update, the check here saves an api call if not required
-        if not need_tag_updates(client.get('tags', []), params.tags_to_find):
+        if not need_tag_updates(client.get('tags', []), params['tags_to_find']):
             log.info(f'Contains no tags to refactor')
             log.info(metrics.print_iter_metrics())
             continue
@@ -455,8 +455,8 @@ def handle_client_tag_updates(skipped_objects: list, clients: list, action: func
         # refactor tags on client
         client_params = {
             "obj_tags": client.get('tags', []),
-            "tags_to_find": params.tags_to_find,
-            "tags_to_act": params.tags_to_act
+            "tags_to_find": params['tags_to_find'],
+            "tags_to_act": params['tags_to_act']
         }
         action(client_params)
 
@@ -473,13 +473,13 @@ def handle_client_tag_updates(skipped_objects: list, clients: list, action: func
         log.info(metrics.print_iter_metrics())
 
 
-def handle_asset_tag_updates(skipped_objects: list, assets: list, action: function, params: action_params) -> None:
+def handle_asset_tag_updates(skipped_objects: list, assets: list, action: Callable[[client_action_params], None], params: action_params) -> None:
     metrics = IterationMetrics(len(assets))
     for asset in assets:
         log.info(f'Processing tags in asset \'{asset["asset"]}\'...')
 
         # check if the asset tags need to be update, the check here saves an api call if not required
-        if not need_tag_updates(asset.get('tags', []), params.tags_to_find):
+        if not need_tag_updates(asset.get('tags', []), params['tags_to_find']):
             log.info(f'Contains no tags to refactor')
             log.info(metrics.print_iter_metrics())
             continue
@@ -497,8 +497,8 @@ def handle_asset_tag_updates(skipped_objects: list, assets: list, action: functi
         # refactor tags on 
         asset_params = {
             "obj_tags": asset.get('tags', []),
-            "tags_to_find": params.tags_to_find,
-            "tags_to_act": params.tags_to_act
+            "tags_to_find": params['tags_to_find'],
+            "tags_to_act": params['tags_to_act']
         }
         action(asset_params)
 
@@ -515,13 +515,13 @@ def handle_asset_tag_updates(skipped_objects: list, assets: list, action: functi
         log.info(metrics.print_iter_metrics())
 
 
-def handle_report_tag_updates(skipped_objects: list, reports: list, action: function, params: action_params) -> None:
+def handle_report_tag_updates(skipped_objects: list, reports: list, action: Callable[[client_action_params], None], params: action_params) -> None:
     metrics = IterationMetrics(len(reports))
     for report in reports:
         log.info(f'Processing tags in report \'{report["name"]}\'...')
 
         # check if the report tags need to be update, the check here saves an api call if not required
-        if need_tag_updates(report.get('tags', []), params.tags_to_find):
+        if need_tag_updates(report.get('tags', []), params['tags_to_find']):
             # get full report object
             try:
                 response = api._v1.reports.get_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'])
@@ -535,8 +535,8 @@ def handle_report_tag_updates(skipped_objects: list, reports: list, action: func
             # refactor tags on report
             report_params = {
                 "obj_tags": report.get('tags', []),
-                "tags_to_find": params.tags_to_find,
-                "tags_to_act": params.tags_to_act
+                "tags_to_find": params['tags_to_find'],
+                "tags_to_act": params['tags_to_act']
             }
             action(report_params)
 
@@ -562,19 +562,19 @@ def handle_report_tag_updates(skipped_objects: list, reports: list, action: func
             continue
         log.debug(f'num of findings founds: {len(findings)}')
 
-        handle_finding_tag_updates(skipped_objects, findings, refractor_tags, params)
+        handle_finding_tag_updates(skipped_objects, findings, action, params)
 
         # metrics for report tags and findings on report
         log.info(metrics.print_iter_metrics())
 
 
-def handle_finding_tag_updates(skipped_objects: list, findings: list, action: function, params: action_params) -> None:
+def handle_finding_tag_updates(skipped_objects: list, findings: list, action: Callable[[client_action_params], None], params: action_params) -> None:
     findings_metrics = IterationMetrics(len(findings))
     for finding in findings:
         log.info(f'Processing tags in finding \'{finding["title"]}\'...')
 
         # check if the finding tags need to be update, the check here saves an api call if not required
-        if not need_tag_updates(finding.get('tags', []), params.tags_to_find):
+        if not need_tag_updates(finding.get('tags', []), params['tags_to_find']):
             log.info(f'Contains no tags to refactor')
             log.info(findings_metrics.print_iter_metrics())
             continue
@@ -582,8 +582,8 @@ def handle_finding_tag_updates(skipped_objects: list, findings: list, action: fu
         # refactor tags on finding
         finding_params = {
             "obj_tags": finding.get('tags', []),
-            "tags_to_find": params.tags_to_find,
-            "tags_to_act": params.tags_to_act
+            "tags_to_find": params['tags_to_find'],
+            "tags_to_act": params['tags_to_act']
         }
         action(finding_params)
 
@@ -600,13 +600,13 @@ def handle_finding_tag_updates(skipped_objects: list, findings: list, action: fu
         log.info(findings_metrics.print_iter_metrics())
 
 
-def handle_writeup_tag_updates(skipped_objects: list, writeups: list, action: function, params: action_params) -> None:
+def handle_writeup_tag_updates(skipped_objects: list, writeups: list, action: Callable[[client_action_params], None], params: action_params) -> None:
     metrics = IterationMetrics(len(writeups))
     for writeup in writeups:
         log.info(f'Processing tags in writeup \'{writeup["title"]}\'...')
 
         # check if the writeup tags need to be update, the check here saves an api call if not required
-        if not need_tag_updates(writeup.get('tags', []), params.tags_to_find):
+        if not need_tag_updates(writeup.get('tags', []), params['tags_to_find']):
             log.info(f'Contains no tags to refactor')
             log.info(metrics.print_iter_metrics())
             continue
@@ -614,8 +614,8 @@ def handle_writeup_tag_updates(skipped_objects: list, writeups: list, action: fu
         # refactor tags on writeup
         writeup_params = {
             "obj_tags": writeup.get('tags', []),
-            "tags_to_find": params.tags_to_find,
-            "tags_to_act": params.tags_to_act
+            "tags_to_find": params['tags_to_find'],
+            "tags_to_act": params['tags_to_act']
         }
         action(writeup_params)
 
@@ -687,7 +687,7 @@ def handle_refactor_tags():
 
     skipped_objects = [0,0,0,0,0] # count of client, asset, report, finding, writeups that could not be refactored
 
-     # add new tags to tenant
+    # add new tags to tenant
     # ----------------------
     add_tags_to_tenant(replacements)
         
@@ -719,7 +719,8 @@ def handle_refactor_tags():
     }
     handle_writeup_tag_updates(skipped_objects, writeups, refractor_tags, refractor_params)
     
-
+    # completion messaging
+    #---------------------
     log.info(f'\n\nFinished refactoring tags on objects.\n')
     if sum(skipped_objects) > 0:
         log.info(f'Could not refactor {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
@@ -730,24 +731,197 @@ def handle_refactor_tags():
     # remove tags from tenant
     # ----------------------
     remove_tags_from_tenant(tags)
-
     log.info(f'Completed. See log file for details')
 
 
-# def handle_remove_tags():
-#     tl = get_tag_locations_from_user(TagLocations())
-#     tags = []
-#     get_multiple_tags_from_user(tags, sanitize=False)
-#     log.info(f'Selected tags to remove: {tags}')
-#     log.info(f'Loading {tl.get_selected()} from instance...')
-#     # loaded this many are you sure you want to remove
-#     # remove all
-#     if tl.is_all_selected and sum(skipped_objects) > 0:
-#         remove_tags_from_tenant(tags)
+def handle_remove_tags():
+    tl = TagLocations()
+    tl.set_all(True)
+
+    # get tags to remove from user
+    # ------------------------------
+    log.info(f'Enter each tag that needs to be removed.')
+    tags = []
+    get_multiple_tags_from_user(tags)
+    to_string_removals = ""
+    for tag in tags:
+        to_string_removals += f"'{tag}' | "
+    to_string_removals = to_string_removals[:-3]
+
+    log.info(f'Selected the following tags to remove: {to_string_removals}')
+    if not input.continue_prompt("Remove selected tags"):
+        exit()
+
+    # load objects from PT
+    # --------------------
+    log.info(f'Loading objects from from Plextrac instance...')
+
+    # get list of all clients in instance
+    clients = []
+    get_page_of_clients(0, clients=clients)
+    log.debug(f'num of clients founds: {len(clients)}')
+
+    # get list of all assets in instance
+    assets = []
+    get_page_of_assets(0, assets=assets)
+    log.debug(f'num of assets founds: {len(assets)}')
+
+    # get list of all report in instance - findings will be later called from reports
+    reports = []
+    get_page_of_reports(0, reports=reports)
+    log.debug(f'num of reports founds: {len(reports)}')
+
+    # get list of all writeups in instance
+    writeups = []
+    get_writeups(writeups)
+    log.debug(f'num of writeups founds: {len(writeups)}')
+
+    # remove tags
+    # --------------
+    log.info(f'Loaded {len(clients)} client(s), {len(assets)} asset(s), {len(reports)} report(s), and {len(writeups)} writeup(s) from your Plextrac instance.')
+    if not input.continue_prompt(f'This will make requests to all objects that have tags to be removed. This make take awhile'):
+        exit()
+
+    skipped_objects = [0,0,0,0,0] # count of client, asset, report, finding, writeups that could not have tags removed
+        
+    # remove client tags
+    remove_params = {
+        "tags_to_find": tags,
+        "tags_to_act": []
+    }
+    handle_client_tag_updates(skipped_objects, clients, remove_tags, remove_params)
+
+    # remove asset tags
+    remove_params = {
+        "tags_to_find": tags,
+        "tags_to_act": []
+    }
+    handle_asset_tag_updates(skipped_objects, assets, remove_tags, remove_params)
+
+    # remove report tags
+    remove_params = {
+        "tags_to_find": tags,
+        "tags_to_act": []
+    }
+    handle_report_tag_updates(skipped_objects, reports, remove_tags, remove_params)
+
+    # remove writeup tags
+    remove_params = {
+        "tags_to_find": tags,
+        "tags_to_act": []
+    }
+    handle_writeup_tag_updates(skipped_objects, writeups, remove_tags, remove_params)
+
+    # completion messaging
+    #---------------------
+    log.info(f'\n\nFinished removing tags on objects.\n')
+    if sum(skipped_objects) > 0:
+        log.info(f'Could not remove tags on {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
+        log.info(f'Skipping removing tag from tenant since all references of tags were not removed from objects')
+        log.info(f'Completed. See log file for details')
+        exit()
+
+    # remove tags from tenant
+    # ----------------------
+    remove_tags_from_tenant(tags)
+    log.info(f'Completed. See log file for details')
 
 
-# def handle_add_tags():
-#     pass
+def handle_add_tags():
+    tl = TagLocations()
+    tl.set_all(True)
+
+    # get tag replacements from user
+    # ------------------------------
+    log.info(f'First enter each tag that needs to be found. Afterwards you will be prompted for each tag entered, to enter another tag that should be added wherever the first was found.')
+    tags = []
+    additions = []
+    to_string_additions = ""
+    get_multiple_tags_from_user(tags)
+    for tag in tags:
+        addition = get_tag_from_user(f'Enter a tag to be added wherever \'{tag}\' is found')
+        additions.append(addition)
+        to_string_additions += f"'{tag}' + '{addition}' | "
+    to_string_additions = to_string_additions[:-3]
+
+    log.info(f'Selected following additions: {to_string_additions}')
+    if not input.continue_prompt("Make selected additions"):
+        exit()
+
+    # load objects from PT
+    # --------------------
+    log.info(f'Loading objects from from Plextrac instance...')
+
+    # get list of all clients in instance
+    clients = []
+    get_page_of_clients(0, clients=clients)
+    log.debug(f'num of clients founds: {len(clients)}')
+
+    # get list of all assets in instance
+    assets = []
+    get_page_of_assets(0, assets=assets)
+    log.debug(f'num of assets founds: {len(assets)}')
+
+    # get list of all report in instance - findings will be later called from reports
+    reports = []
+    get_page_of_reports(0, reports=reports)
+    log.debug(f'num of reports founds: {len(reports)}')
+
+    # get list of all writeups in instance
+    writeups = []
+    get_writeups(writeups)
+    log.debug(f'num of writeups founds: {len(writeups)}')
+
+    # add tags
+    # --------------
+    log.info(f'Loaded {len(clients)} client(s), {len(assets)} asset(s), {len(reports)} report(s), and {len(writeups)} writeup(s) from your Plextrac instance.')
+    if not input.continue_prompt(f'This will make requests to all objects that have tags to be added. This make take awhile'):
+        exit()
+
+    skipped_objects = [0,0,0,0,0] # count of client, asset, report, finding, writeups that could not be added
+
+    # add new tags to tenant
+    # ----------------------
+    add_tags_to_tenant(additions)
+        
+    # add client tags
+    addition_params = {
+        "tags_to_find": tags,
+        "tags_to_act": additions
+    }
+    handle_client_tag_updates(skipped_objects, clients, add_tags, addition_params)
+
+    # add asset tags
+    addition_params = {
+        "tags_to_find": tags,
+        "tags_to_act": additions
+    }
+    handle_asset_tag_updates(skipped_objects, assets, add_tags, addition_params)
+
+    # add report tags
+    addition_params = {
+        "tags_to_find": tags,
+        "tags_to_act": additions
+    }
+    handle_report_tag_updates(skipped_objects, reports, add_tags, addition_params)
+
+    # add writeup tags
+    addition_params = {
+        "tags_to_find": tags,
+        "tags_to_act": additions
+    }
+    handle_writeup_tag_updates(skipped_objects, writeups, add_tags, addition_params)
+    
+    # completion messaging
+    #---------------------
+    log.info(f'\n\nFinished adding tags on objects.\n')
+    if sum(skipped_objects) > 0:
+        log.info(f'Could not add tags to {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
+        log.info(f'Completed. See log file for details')
+        exit()
+
+    log.info(f'Completed. See log file for details')
+
 
 
 if __name__ == '__main__':
@@ -760,13 +934,14 @@ if __name__ == '__main__':
     auth = Auth(args)
     auth.handle_authentication()
 
-    # VALID_TAG_ACTIONS = ["remove", "refactor"]
-    # tag_action = input.user_options(f'Select whether you want to remove or refactor tags', "Invalid option", VALID_TAG_ACTIONS)
-    # if tag_action == "remove":
-    #     handle_remove_tags()
-    # elif tag_action == "refactor":
-    #     handle_refactor_tags()
-    # elif tag_action == "add":
-    #     handle_add_tags()
-
-    handle_refactor_tags()
+    VALID_TAG_ACTIONS = ["refractor", "remove", "add"]
+    tag_action = input.user_options(f'Select an action for bulk tag updates', "Invalid option", VALID_TAG_ACTIONS)
+    if tag_action == "refractor":
+        log.info(f'Selected refractor mode. This will allow you to replace tags with other tags.')
+        handle_refactor_tags()
+    elif tag_action == "remove":
+        log.info(f'Selected removal mode. This will allow you to remove all occurences of tags.')
+        handle_remove_tags()
+    elif tag_action == "add":
+        log.info(f'Selected addition mode. This will allow you to add a tags to objects with existing tags.')
+        handle_add_tags()
