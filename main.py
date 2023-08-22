@@ -59,10 +59,13 @@ class TagLocations():
 
 def get_tag_locations_from_user(tl: TagLocations) -> TagLocations:
     log.info(f'Tags can be stored on the following objects in a Plextrac instance: {tl.objs}')
+    log.info(f'IMPORTANT: If all objects aren\'t selected, tags will not be removed from the tenant level')
     while True:
-        choice = input.user_options(f'Select objects to update tags on. Enter a selected object to deselect. Enter done to continue', "Invalid option", tl.objs + ["done"])
+        choice = input.user_options(f'Select objects to update tags on. Enter a selected object to deselect. Enter all to select all. Enter done to continue', "Invalid option", tl.objs + ["all", "done"])
         if choice == "done":
             break
+        if choice == "all":
+            tl.set_all(True)
         update = not tl.__getattribute__(choice)
         tl.__setattr__(choice, update)
         log.info(f'{"Selected" if update else "Deselected"} {choice}')
@@ -635,7 +638,8 @@ def handle_writeup_tag_updates(skipped_objects: list, writeups: list, action: Ca
 
 def handle_refactor_tags():
     tl = TagLocations()
-    tl.set_all(True)
+    # tl.set_all(True)
+    tl = get_tag_locations_from_user(tl)
 
     # get tag replacements from user
     # ------------------------------
@@ -661,23 +665,27 @@ def handle_refactor_tags():
 
     # get list of all clients in instance
     clients = []
-    get_page_of_clients(0, clients=clients)
-    log.debug(f'num of clients founds: {len(clients)}')
+    if "clients" in tl.get_selected():
+        get_page_of_clients(0, clients=clients)
+        log.debug(f'num of clients founds: {len(clients)}')
 
     # get list of all assets in instance
     assets = []
-    get_page_of_assets(0, assets=assets)
-    log.debug(f'num of assets founds: {len(assets)}')
+    if "assets" in tl.get_selected():
+        get_page_of_assets(0, assets=assets)
+        log.debug(f'num of assets founds: {len(assets)}')
 
     # get list of all report in instance - findings will be later called from reports
     reports = []
-    get_page_of_reports(0, reports=reports)
-    log.debug(f'num of reports founds: {len(reports)}')
+    if "reports" in tl.get_selected():
+        get_page_of_reports(0, reports=reports)
+        log.debug(f'num of reports founds: {len(reports)}')
 
     # get list of all writeups in instance
     writeups = []
-    get_writeups(writeups)
-    log.debug(f'num of writeups founds: {len(writeups)}')
+    if "writeups" in tl.get_selected():
+        get_writeups(writeups)
+        log.debug(f'num of writeups founds: {len(writeups)}')
 
     # refactor tags
     # --------------
@@ -723,20 +731,24 @@ def handle_refactor_tags():
     #---------------------
     log.info(f'\n\nFinished refactoring tags on objects.\n')
     if sum(skipped_objects) > 0:
-        log.info(f'Could not refactor {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
+        log.warning(f'Could not refactor {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
         log.info(f'Skipping removing tag from tenant since all references of tags were not removed from objects')
         log.info(f'Completed. See log file for details')
         exit()
 
     # remove tags from tenant
     # ----------------------
+    if not tl.is_all_selected():
+        log.info(f'Skipping removing tag from tenant since not all objects were selected to make refractions on')
+        exit()
     remove_tags_from_tenant(tags)
     log.info(f'Completed. See log file for details')
 
 
 def handle_remove_tags():
     tl = TagLocations()
-    tl.set_all(True)
+    # tl.set_all(True)
+    tl = get_tag_locations_from_user(tl)
 
     # get tags to remove from user
     # ------------------------------
@@ -758,23 +770,27 @@ def handle_remove_tags():
 
     # get list of all clients in instance
     clients = []
-    get_page_of_clients(0, clients=clients)
-    log.debug(f'num of clients founds: {len(clients)}')
+    if "clients" in tl.get_selected():
+        get_page_of_clients(0, clients=clients)
+        log.debug(f'num of clients founds: {len(clients)}')
 
     # get list of all assets in instance
     assets = []
-    get_page_of_assets(0, assets=assets)
-    log.debug(f'num of assets founds: {len(assets)}')
+    if "assets" in tl.get_selected():
+        get_page_of_assets(0, assets=assets)
+        log.debug(f'num of assets founds: {len(assets)}')
 
     # get list of all report in instance - findings will be later called from reports
     reports = []
-    get_page_of_reports(0, reports=reports)
-    log.debug(f'num of reports founds: {len(reports)}')
+    if "reports" in tl.get_selected():
+        get_page_of_reports(0, reports=reports)
+        log.debug(f'num of reports founds: {len(reports)}')
 
     # get list of all writeups in instance
     writeups = []
-    get_writeups(writeups)
-    log.debug(f'num of writeups founds: {len(writeups)}')
+    if "writeups" in tl.get_selected():
+        get_writeups(writeups)
+        log.debug(f'num of writeups founds: {len(writeups)}')
 
     # remove tags
     # --------------
@@ -816,20 +832,24 @@ def handle_remove_tags():
     #---------------------
     log.info(f'\n\nFinished removing tags on objects.\n')
     if sum(skipped_objects) > 0:
-        log.info(f'Could not remove tags on {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
+        log.warning(f'Could not remove tags on {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
         log.info(f'Skipping removing tag from tenant since all references of tags were not removed from objects')
         log.info(f'Completed. See log file for details')
         exit()
 
     # remove tags from tenant
     # ----------------------
+    if not tl.is_all_selected():
+        log.info(f'Skipping removing tag from tenant since not all objects were selected to make refractions on')
+        exit()
     remove_tags_from_tenant(tags)
     log.info(f'Completed. See log file for details')
 
 
 def handle_add_tags():
     tl = TagLocations()
-    tl.set_all(True)
+    # tl.set_all(True)
+    tl = get_tag_locations_from_user(tl)
 
     # get tag replacements from user
     # ------------------------------
@@ -854,23 +874,27 @@ def handle_add_tags():
 
     # get list of all clients in instance
     clients = []
-    get_page_of_clients(0, clients=clients)
-    log.debug(f'num of clients founds: {len(clients)}')
+    if "clients" in tl.get_selected():
+        get_page_of_clients(0, clients=clients)
+        log.debug(f'num of clients founds: {len(clients)}')
 
     # get list of all assets in instance
     assets = []
-    get_page_of_assets(0, assets=assets)
-    log.debug(f'num of assets founds: {len(assets)}')
+    if "assets" in tl.get_selected():
+        get_page_of_assets(0, assets=assets)
+        log.debug(f'num of assets founds: {len(assets)}')
 
     # get list of all report in instance - findings will be later called from reports
     reports = []
-    get_page_of_reports(0, reports=reports)
-    log.debug(f'num of reports founds: {len(reports)}')
+    if "reports" in tl.get_selected():
+        get_page_of_reports(0, reports=reports)
+        log.debug(f'num of reports founds: {len(reports)}')
 
     # get list of all writeups in instance
     writeups = []
-    get_writeups(writeups)
-    log.debug(f'num of writeups founds: {len(writeups)}')
+    if "writeups" in tl.get_selected():
+        get_writeups(writeups)
+        log.debug(f'num of writeups founds: {len(writeups)}')
 
     # add tags
     # --------------
@@ -916,7 +940,7 @@ def handle_add_tags():
     #---------------------
     log.info(f'\n\nFinished adding tags on objects.\n')
     if sum(skipped_objects) > 0:
-        log.info(f'Could not add tags to {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
+        log.warning(f'Could not add tags to {skipped_objects[0]} client(s), {skipped_objects[1]} asset(s), {skipped_objects[2]} report(s), {skipped_objects[3]} finding(s), and {skipped_objects[4]} writeup(s). See log file for details')
         log.info(f'Completed. See log file for details')
         exit()
 
