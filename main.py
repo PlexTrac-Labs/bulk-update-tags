@@ -518,54 +518,56 @@ def handle_asset_tag_updates(skipped_objects: list, assets: list, action: Callab
         log.info(metrics.print_iter_metrics())
 
 
-def handle_report_tag_updates(skipped_objects: list, reports: list, action: Callable[[client_action_params], None], params: action_params) -> None:
+def handle_report_tag_updates(skipped_objects: list, reports: list, tl: TagLocations, action: Callable[[client_action_params], None], params: action_params) -> None:
     metrics = IterationMetrics(len(reports))
     for report in reports:
-        log.info(f'Processing tags in report \'{report["name"]}\'...')
 
-        # check if the report tags need to be update, the check here saves an api call if not required
-        if need_tag_updates(report.get('tags', []), params['tags_to_find']):
-            # get full report object
-            try:
-                response = api._v1.reports.get_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'])
-            except Exception as e:
-                log.exception(f'Could not load report. Skipping...')
-                skipped_objects[2] += 1
-                log.info(metrics.print_iter_metrics())
+        if "reports" in tl.get_selected():
+            log.info(f'Processing tags in report \'{report["name"]}\'...')
+            # check if the report tags need to be update, the check here saves an api call if not required
+            if need_tag_updates(report.get('tags', []), params['tags_to_find']):
+                # get full report object
+                try:
+                    response = api._v1.reports.get_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'])
+                except Exception as e:
+                    log.exception(f'Could not load report. Skipping...')
+                    skipped_objects[2] += 1
+                    log.info(metrics.print_iter_metrics())
+                    continue
+                detailed_report = response.json
+
+                # refactor tags on report
+                report_params = {
+                    "obj_tags": report.get('tags', []),
+                    "tags_to_find": params['tags_to_find'],
+                    "tags_to_act": params['tags_to_act']
+                }
+                action(report_params)
+
+                # update report
+                try:
+                    response = api._v1.reports.update_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'], detailed_report)
+                except Exception as e:
+                    log.exception(f'Could not update report. Skipping...')
+                    skipped_objects[2] += 1
+                    log.info(metrics.print_iter_metrics())
+                    continue
+
+                log.success(f'Refactored all tags in {report["name"]}')
+            else:
+                log.info(f'Report contains no tags to refactor')
+
+        if "findings" in tl.get_selected():
+            # refactor finding tags
+            if report.get('findings', 0) < 1:
                 continue
-            detailed_report = response.json
-
-            # refactor tags on report
-            report_params = {
-                "obj_tags": report.get('tags', []),
-                "tags_to_find": params['tags_to_find'],
-                "tags_to_act": params['tags_to_act']
-            }
-            action(report_params)
-
-            # update report
-            try:
-                response = api._v1.reports.update_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'], detailed_report)
-            except Exception as e:
-                log.exception(f'Could not update report. Skipping...')
-                skipped_objects[2] += 1
-                log.info(metrics.print_iter_metrics())
+            log.info(f'Loading findings from report...')
+            findings = []
+            if not get_page_of_findings(report['client_id'], report['id'], 0, findings=findings):
                 continue
+            log.debug(f'num of findings founds: {len(findings)}')
 
-            log.success(f'Refactored all tags in {report["name"]}')
-        else:
-            log.info(f'Report contains no tags to refactor')
-
-        # refactor finding tags
-        if report.get('findings', 0) < 1:
-            continue
-        log.info(f'Loading findings from report...')
-        findings = []
-        if not get_page_of_findings(report['client_id'], report['id'], 0, findings=findings):
-            continue
-        log.debug(f'num of findings founds: {len(findings)}')
-
-        handle_finding_tag_updates(skipped_objects, findings, action, params)
+            handle_finding_tag_updates(skipped_objects, findings, action, params)
 
         # metrics for report tags and findings on report
         log.info(metrics.print_iter_metrics())
@@ -677,7 +679,7 @@ def handle_refactor_tags():
 
     # get list of all report in instance - findings will be later called from reports
     reports = []
-    if "reports" in tl.get_selected():
+    if "reports" in tl.get_selected() or "findings" in tl.get_selected():
         get_page_of_reports(0, reports=reports)
         log.debug(f'num of reports founds: {len(reports)}')
 
@@ -718,7 +720,7 @@ def handle_refactor_tags():
         "tags_to_find": tags,
         "tags_to_act": replacements
     }
-    handle_report_tag_updates(skipped_objects, reports, refractor_tags, refractor_params)
+    handle_report_tag_updates(skipped_objects, reports, tl, refractor_tags, refractor_params)
 
     # refactor writeup tags
     refractor_params = {
@@ -782,7 +784,7 @@ def handle_remove_tags():
 
     # get list of all report in instance - findings will be later called from reports
     reports = []
-    if "reports" in tl.get_selected():
+    if "reports" in tl.get_selected() or "findings" in tl.get_selected():
         get_page_of_reports(0, reports=reports)
         log.debug(f'num of reports founds: {len(reports)}')
 
@@ -819,7 +821,7 @@ def handle_remove_tags():
         "tags_to_find": tags,
         "tags_to_act": []
     }
-    handle_report_tag_updates(skipped_objects, reports, remove_tags, remove_params)
+    handle_report_tag_updates(skipped_objects, reports, tl, remove_tags, remove_params)
 
     # remove writeup tags
     remove_params = {
@@ -886,7 +888,7 @@ def handle_add_tags():
 
     # get list of all report in instance - findings will be later called from reports
     reports = []
-    if "reports" in tl.get_selected():
+    if "reports" in tl.get_selected() or "findings" in tl.get_selected():
         get_page_of_reports(0, reports=reports)
         log.debug(f'num of reports founds: {len(reports)}')
 
@@ -927,7 +929,7 @@ def handle_add_tags():
         "tags_to_find": tags,
         "tags_to_act": additions
     }
-    handle_report_tag_updates(skipped_objects, reports, add_tags, addition_params)
+    handle_report_tag_updates(skipped_objects, reports, tl, add_tags, addition_params)
 
     # add writeup tags
     addition_params = {
