@@ -445,19 +445,12 @@ def handle_client_tag_updates(skipped_objects: list, clients: list, action: Call
             log.info(metrics.print_iter_metrics())
             continue
 
-        # get full client object
-        try:
-            response = api._v1.clients.get_client(auth.base_url, auth.get_auth_headers(), client['client_id'])
-        except Exception as e:
-            log.exception(f'Could not load client. Skipping...')
-            skipped_objects[0] += 1
-            log.info(metrics.print_iter_metrics())
-            continue
-        client_tag_update_payload = {"tags": response.json.get('tags', [])}
+        # get needed client object
+        client_update_payload = {"tags": client.get('tags', [])} # the update endpoint is not a true PUT and works to just update the keys in the request
 
         # refactor tags on client
         client_params = {
-            "obj_tags": client.get('tags', []),
+            "obj_tags": client_update_payload.get('tags', []),
             "tags_to_find": params['tags_to_find'],
             "tags_to_act": params['tags_to_act']
         }
@@ -465,7 +458,7 @@ def handle_client_tag_updates(skipped_objects: list, clients: list, action: Call
 
         # update client
         try:
-            response = api._v1.clients.update_client(auth.base_url, auth.get_auth_headers(), client['client_id'], client_tag_update_payload)
+            response = api._v1.clients.update_client(auth.base_url, auth.get_auth_headers(), client['client_id'], client_update_payload)
         except Exception as e:
             log.exception(f'Could not update client. Skipping...')
             skipped_objects[0] += 1
@@ -490,16 +483,16 @@ def handle_asset_tag_updates(skipped_objects: list, assets: list, action: Callab
         # get full asset object
         try:
             response = api._v1.assets.get_asset(auth.base_url, auth.get_auth_headers(), asset['client_id'], asset['id'])
+            asset_update_payload = response.json
         except Exception as e:
             log.exception(f'Could not load asset. Skipping...')
             skipped_objects[1] += 1
             log.info(metrics.print_iter_metrics())
             continue
-        detailed_asset = response.json
-
+        
         # refactor tags on 
         asset_params = {
-            "obj_tags": asset.get('tags', []),
+            "obj_tags": asset_update_payload.get('tags', []),
             "tags_to_find": params['tags_to_find'],
             "tags_to_act": params['tags_to_act']
         }
@@ -507,7 +500,7 @@ def handle_asset_tag_updates(skipped_objects: list, assets: list, action: Callab
 
         # update asset
         try:
-            response = api._v1.assets.update_asset(auth.base_url, auth.get_auth_headers(), asset['client_id'], asset['id'], detailed_asset)
+            response = api._v1.assets.update_asset(auth.base_url, auth.get_auth_headers(), asset['client_id'], asset['id'], asset_update_payload)
         except Exception as e:
             log.exception(f'Could not update asset. Skipping...')
             skipped_objects[1] += 1
@@ -524,21 +517,14 @@ def handle_report_tag_updates(skipped_objects: list, reports: list, tl: TagLocat
 
         if "reports" in tl.get_selected():
             log.info(f'Processing tags in report \'{report["name"]}\'...')
-            # check if the report tags need to be update, the check here saves an api call if not required
+            # check if the report tags need to be update
             if need_tag_updates(report.get('tags', []), params['tags_to_find']):
-                # get full report object
-                try:
-                    response = api._v1.reports.get_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'])
-                except Exception as e:
-                    log.exception(f'Could not load report. Skipping...')
-                    skipped_objects[2] += 1
-                    log.info(metrics.print_iter_metrics())
-                    continue
-                detailed_report = response.json
+                # get needed report object
+                report_update_payload = {"tags": report.get('tags', [])} # the update endpoint is not a true PUT and works to just update the keys in the request
 
                 # refactor tags on report
                 report_params = {
-                    "obj_tags": report.get('tags', []),
+                    "obj_tags": report_update_payload.get('tags', []),
                     "tags_to_find": params['tags_to_find'],
                     "tags_to_act": params['tags_to_act']
                 }
@@ -546,7 +532,7 @@ def handle_report_tag_updates(skipped_objects: list, reports: list, tl: TagLocat
 
                 # update report
                 try:
-                    response = api._v1.reports.update_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'], detailed_report)
+                    response = api._v1.reports.update_report(auth.base_url, auth.get_auth_headers(), report['client_id'], report['id'], report_update_payload)
                 except Exception as e:
                     log.exception(f'Could not update report. Skipping...')
                     skipped_objects[2] += 1
@@ -584,9 +570,19 @@ def handle_finding_tag_updates(skipped_objects: list, findings: list, action: Ca
             log.info(findings_metrics.print_iter_metrics())
             continue
 
+        # get full finding object - this shouldn't be needed but the response from the bulk vs single get is slightly different
+        try:
+            response = api._v1.findings.get_finding(auth.base_url, auth.get_auth_headers(), finding['client_id'], finding['report_id'], finding['flaw_id'])
+            finding_update_payload = response.json
+        except Exception as e:
+            log.exception(f'Could not load finding. Skipping...')
+            skipped_objects[1] += 1
+            log.info(findings_metrics.print_iter_metrics())
+            continue
+
         # refactor tags on finding
         finding_params = {
-            "obj_tags": finding.get('tags', []),
+            "obj_tags": finding_update_payload.get('tags', []),
             "tags_to_find": params['tags_to_find'],
             "tags_to_act": params['tags_to_act']
         }
@@ -594,7 +590,7 @@ def handle_finding_tag_updates(skipped_objects: list, findings: list, action: Ca
 
         # update finding
         try:
-            response = api._v1.findings.update_finding(auth.base_url, auth.get_auth_headers(), finding['client_id'], finding['report_id'], finding['flaw_id'], finding)
+            response = api._v1.findings.update_finding(auth.base_url, auth.get_auth_headers(), finding['client_id'], finding['report_id'], finding['flaw_id'], finding_update_payload)
         except Exception as e:
             log.exception(f'Could not update finding. Skipping...')
             skipped_objects[3] += 1
@@ -610,7 +606,7 @@ def handle_writeup_tag_updates(skipped_objects: list, writeups: list, action: Ca
     for writeup in writeups:
         log.info(f'Processing tags in writeup \'{writeup["title"]}\'...')
 
-        # check if the writeup tags need to be update, the check here saves an api call if not required
+        # check if the writeup tags need to be update
         if not need_tag_updates(writeup.get('tags', []), params['tags_to_find']):
             log.info(f'Contains no tags to refactor')
             log.info(metrics.print_iter_metrics())
