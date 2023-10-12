@@ -61,13 +61,16 @@ def get_tag_locations_from_user(tl: TagLocations) -> TagLocations:
     log.info(f'Tags can be stored on the following objects in a Plextrac instance: {tl.objs}')
     log.info(f'IMPORTANT: If all objects aren\'t selected, tags will not be removed from the tenant level')
     while True:
-        choice = input.user_options(f'Select objects to update tags on. Enter a selected object to deselect. Enter all to select all. Enter done to continue', "Invalid option", tl.objs + ["all", "done"])
+        choice = input.user_options(f'Select objects to update tags on. Enter a selected object to deselect. Enter all or none to select/deselect all. Enter done to continue', "Invalid option", tl.objs + ["all", "none", "done"])
         if choice == "done":
             break
         if choice == "all":
             tl.set_all(True)
-        update = not tl.__getattribute__(choice)
-        tl.__setattr__(choice, update)
+        elif choice == "none":
+            tl.set_all(False)
+        else:
+            update = not tl.__getattribute__(choice)
+            tl.__setattr__(choice, update)
         log.info(f'{"Selected" if update else "Deselected"} {choice}')
         log.info(f'Currently selected locations to update tags')
         tl.display_option_values()
@@ -638,6 +641,9 @@ def handle_refactor_tags():
     tl = TagLocations()
     # tl.set_all(True)
     tl = get_tag_locations_from_user(tl)
+    if len(tl.get_selected()) == 0:
+        log.info(f'No locations selected to refractor tags. Exiting...')
+        exit()
 
     # get tag replacements from user
     # ------------------------------
@@ -747,6 +753,9 @@ def handle_remove_tags():
     tl = TagLocations()
     # tl.set_all(True)
     tl = get_tag_locations_from_user(tl)
+    if len(tl.get_selected()) == 0:
+        log.info(f'No locations selected to remove tags. Exiting...')
+        exit()
 
     # get tags to remove from user
     # ------------------------------
@@ -848,6 +857,9 @@ def handle_add_tags():
     tl = TagLocations()
     # tl.set_all(True)
     tl = get_tag_locations_from_user(tl)
+    if len(tl.get_selected()) == 0:
+        log.info(f'No locations selected to add tags. Exiting...')
+        exit()
 
     # get tag replacements from user
     # ------------------------------
