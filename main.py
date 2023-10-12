@@ -136,7 +136,7 @@ def get_page_of_clients(page: int = 0, clients: list = [], total_clients: int = 
     if response.json['status'] != "success":
         log.critical(f'Could not retrieve clients from instance. Exiting...')
         exit()
-    total_clients = response.json['meta']['pagination']['total']|int
+    total_clients = int(response.json['meta']['pagination']['total'])
     if len(response.json['data']) > 0:
         clients += deepcopy(response.json['data'])
 
@@ -182,7 +182,7 @@ def get_page_of_assets(page: int = 0, assets: list = [], total_assets: int = -1)
     if response.json['status'] != "success":
         log.critical(f'Could not retrieve assets from instance. Exiting...')
         exit()
-    total_assets = response.json['meta']['pagination']['total']|int
+    total_assets = int(response.json['meta']['pagination']['total'])
     if len(response.json['assets']) > 0:
         assets += deepcopy(response.json['assets'])
 
@@ -221,7 +221,7 @@ def get_page_of_reports(page: int, reports: list = [], total_reports: int = -1) 
     if response.json['status'] != "success":
         log.critical(f'Could not retrieve reports from instance. Exiting...')
         exit()
-    total_reports = response.json['meta']['pagination']['total']|int
+    total_reports = int(response.json['meta']['pagination']['total'])
     if len(response.json['data']) > 0:
         reports += deepcopy(response.json['data'])
 
@@ -287,7 +287,7 @@ def get_page_of_findings(client_id: int, report_id: int, page: int = 0, findings
     if response.json['status'] != "success":
         log.exception(f'Could not retrieve findings from report. Skipping...')
         return False
-    total_findings = response.json['meta']['pagination']['total']|int
+    total_findings = int(response.json['meta']['pagination']['total'])
     if len(response.json['data']) > 0:
         findings += deepcopy(response.json['data'])
 
