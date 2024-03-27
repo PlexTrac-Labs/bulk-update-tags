@@ -71,7 +71,7 @@ def get_tag_locations_from_user(tl: TagLocations) -> TagLocations:
         else:
             update = not tl.__getattribute__(choice)
             tl.__setattr__(choice, update)
-        log.info(f'{"Selected" if update else "Deselected"} {choice}')
+            log.info(f'{"Selected" if update else "Deselected"} {choice}')
         log.info(f'Currently selected locations to update tags')
         tl.display_option_values()
 
