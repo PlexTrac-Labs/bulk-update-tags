@@ -9,20 +9,35 @@ log = logger.log
 
 def format_key(string: str) -> str:
     """
-    PT keys and tags should be lowercase alphanumeric strings, including (a-z), (0-9), and underscores (_)
+    PT keys should be lowercase alphanumeric strings, including (a-z), (0-9), and underscores (_)
     String is cleaned by:
      - lowercasing string
      - replacing spaces ( ) and dashes (-) with underscores
      - striping non alphanumeric characters
 
-    :param str: string to be cleaned
-    :type str: str
+    :param string: string to be cleaned
+    :type string: str
     :return: cleaned alphanumeric string
     :rtype: str
     """
     new_str = string.strip().lower()
     return re.sub('[\W]', '', re.sub('[ -]', '_', new_str))
 
+def format_tag(unclean_tag:str) -> str:
+    """
+    PT tags should be lowercase alphanumeric strings with the exception of colons, including (a-z), (0-9), underscores (_), and colons (:)
+    String is cleaned by:
+     - lowercasing string
+     - replacing spaces ( ) and dashes (-) with underscores
+     - striping non alphanumeric, non colon characters
+
+    :param unclean_tag: tag to be cleaned
+    :type unclean_tag: str
+    :return: cleaned alphanumeric string
+    :rtype: str
+    """
+    clean_tag = unclean_tag.strip().lower()
+    return re.sub('[^\w:]', '', re.sub('[ -]', '_', clean_tag))
 
 def add_tag(list: List[str], tag: str) -> None:
     """

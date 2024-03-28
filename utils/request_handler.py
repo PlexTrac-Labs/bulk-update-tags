@@ -8,7 +8,8 @@ import settings
 import utils.log_handler as logger
 log = logger.log
 
-from api.exceptions import *
+from api.exceptions import PTWrapperLibraryException, PTWrapperLibraryJSONResponse, PTWrapperLibraryFailed
+
 
 
 class PTWrapperLibraryResponse():

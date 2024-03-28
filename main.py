@@ -1,7 +1,6 @@
 import yaml
 from tabulate import tabulate
 from copy import deepcopy
-import requests
 from typing import TypedDict, List, Callable
 
 import settings
@@ -12,7 +11,8 @@ import utils.input_utils as input
 import utils.general_utils as utils
 from utils.log_handler import IterationMetrics
 import api
-from api.exceptions import *
+from api.exceptions import PTWrapperLibraryFailed
+
 
 
 class TagLocations():
@@ -66,12 +66,14 @@ def get_tag_locations_from_user(tl: TagLocations) -> TagLocations:
             break
         if choice == "all":
             tl.set_all(True)
+            log.info("Selected all")
         elif choice == "none":
             tl.set_all(False)
+            log.info("Deselected all")
         else:
             update = not tl.__getattribute__(choice)
             tl.__setattr__(choice, update)
-        log.info(f'{"Selected" if update else "Deselected"} {choice}')
+            log.info(f'{"Selected" if update else "Deselected"} {choice}')
         log.info(f'Currently selected locations to update tags')
         tl.display_option_values()
 
@@ -96,7 +98,7 @@ def get_tag_from_user(msg:str="Please enter a tag", sanitize:bool=True) -> str:
     if sanitize == False:
         return tag
     
-    clean_tag = utils.format_key(tag)
+    clean_tag = utils.format_tag(tag)
     if tag == clean_tag:
         return tag
     

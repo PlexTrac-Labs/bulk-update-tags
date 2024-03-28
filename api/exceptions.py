@@ -1,4 +1,4 @@
-from requests.exceptions import *
+from requests.exceptions import RequestException, InvalidJSONError, HTTPError
 
 class PTWrapperLibraryException(RequestException):
     pass
